@@ -1,7 +1,7 @@
 from det import DET
 import numpy as np
 import os
-from pysmt.shortcuts import BOOL, REAL, Symbol
+from pysmt.shortcuts import BOOL, REAL, Symbol, reset_env
 from pywmi import Density
 from string import ascii_letters
 from sys import argv
@@ -93,6 +93,10 @@ if not os.path.isdir(benchmark_folder):
     os.mkdir(benchmark_folder)
 
 for exp in EXPERIMENTS:
+
+    # fresh pysmt environment
+    reset_env()
+    
     detfile = os.path.join(benchmark_folder, f'det-{exp}-{nmin}-{nmax}.json')
 
     if os.path.isfile(detfile):
