@@ -70,9 +70,12 @@ class ReluNet(ModulePlus):
                                    Equals(out, aux),
                                    Equals(out, Real(0))))
                 formula.append(LE(Real(0), out))
-                formula.append(LE(out, aux))
+                formula.append(LE(aux, out))
 
             prv = nxt
+
+        for clause in formula:
+            print('   ', serialize(clause))
 
         formula = And(*formula)
         self.output_vars = []        
