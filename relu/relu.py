@@ -66,9 +66,11 @@ class ReluNet(ModulePlus):
                                   prv[j]) for j in range(len(prv))])
                 nxt.append(out)
                 formula.append(Equals(aux, Plus(b, wx)))
-                formula.append(Ite(LE(Real(0), aux),
+                formula.append(Ite(LT(Real(0), aux),
                                    Equals(out, aux),
                                    Equals(out, Real(0))))
+                formula.append(Not(And(Equals(out, aux),
+                                   Equals(out, Real(0)))))
                 formula.append(LE(Real(0), out))
                 formula.append(LE(aux, out))
 
