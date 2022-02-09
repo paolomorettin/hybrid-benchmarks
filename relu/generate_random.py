@@ -1,7 +1,8 @@
 
+from numpy import inf
 import numpy.random as rng
 import os
-from pysmt.shortcuts import And, Real, LE, reset_env
+from pysmt.shortcuts import And, Bool, Real, LE, reset_env
 from pywmi import Density, Domain
 from relu import ReluNet
 from sys import argv
@@ -34,15 +35,21 @@ for i in range(nproblems):
 
     rng.seed(seed+i)
     if mode == 'uniform':
+        cnames = []
+        bounds= []        
         smtbounds = []
         for var in nn.input_vars:
             l, u = sorted([rng.uniform(), rng.uniform()])
+            assert(l <= u)
             smtbounds.append(LE(Real(l), var))
             smtbounds.append(LE(var, Real(u)))
+            cnames.append(var.symbol_name())
+            bounds.append((-inf,+inf))
 
-        cnames = [v.symbol_name()
-                  for v in formula.get_free_variables()]
-        bounds = [(0,1) for _ in range(len(cnames))]
+        cnames.extend([v.symbol_name()
+                       for v in formula.get_free_variables()
+                       if v.symbol_name() not in cnames])
+        bounds.extend([(-inf, +inf) for _ in range(len(cnames)-len(bounds))])
         domain = Domain.make([], cnames, bounds)
         support = And(formula, *smtbounds)
         weight = Real(1)
