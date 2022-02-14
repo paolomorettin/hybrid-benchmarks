@@ -8,15 +8,16 @@ from relu import ReluNet
 from sys import argv
 
 if len(argv) <= 1:
-    print("USAGE: python3 generate_random.py SEED MODE N-PROBLEMS DIMENSIONS")
+    print("USAGE: python3 generate_random.py SEED THRESHOLD MODE N-PROBLEMS DIMENSIONS")
     exit(1)
 
 seed = int(argv[1])
-mode = argv[2].lower().strip()
-nproblems = int(argv[3])
-dimensions = [int(x) for x in argv[4:]]
+threshold = float(argv[2])
+mode = argv[3].lower().strip()
+nproblems = int(argv[4])
+dimensions = [int(x) for x in argv[5:]]
 
-benchmark_folder = f'relu-{mode}-{seed}-'+'-'.join(map(str, dimensions))
+benchmark_folder = f'relu-{threshold}-{mode}-{seed}-'+'-'.join(map(str, dimensions))
 
 if not os.path.isdir(benchmark_folder):
     os.mkdir(benchmark_folder)
@@ -31,12 +32,12 @@ for i in range(nproblems):
     relufile = os.path.join(benchmark_folder, f'relu-{i}.json')
 
     nn = ReluNet(dimensions, seed+i)
-    formula = nn.formula
+    formula = nn.to_smt(threshold)
 
     rng.seed(seed+i)
     if mode == 'uniform':
         cnames = []
-        bounds= []        
+        bounds= []
         smtbounds = []
         for var in nn.input_vars:
             l, u = sorted([rng.uniform(), rng.uniform()])
