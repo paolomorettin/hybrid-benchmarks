@@ -31,13 +31,12 @@ class ReluNet(ModulePlus):
                           torch.nn.ReLU()])        
             
         self.network = torch.nn.Sequential(*stack)
-        self.to_smt()
 
     def forward(self, x):
         return self.network(x)
 
 
-    def to_smt(self):
+    def to_smt(self, threshold=0.0):
 
         assert(len(self.network) % 2 == 0)
         assert(all(isinstance(l, torch.nn.Linear)
@@ -55,22 +54,34 @@ class ReluNet(ModulePlus):
 
         self.input_vars = list(prv)
 
-        for l in range(int(len(self.network)/2)):
-            # linear combinations
+        for l in range(int(len(self.network)/2)): # for each layer
             nxt = []
+            # for each neuron in layer
             for i in range(self.network[l*2].weight.size()[0]):
-                aux = Symbol(f'a_{l*2}_{i}', REAL)
-                out = Symbol(f'h_{l*2}_{i}', REAL)
-                b = Real(float(self.network[l*2].bias[i]))
-                wx = Plus(*[Times(Real(float(self.network[l*2].weight[i,j])),
-                                  prv[j]) for j in range(len(prv))])
-                nxt.append(out)
-                formula.append(Equals(aux, Plus(b, wx)))
-                formula.append(Ite(LE(Real(0), aux),
-                                   Equals(out, aux),
-                                   Equals(out, Real(0))))
-                formula.append(LE(Real(0), out))
-                formula.append(LE(aux, out))
+
+                # compute coefficients
+                summands = []                
+                for j in range(len(prv)): # for each input to the l-th layer
+                    w = self.network[l*2].weight[i,j]; assert(w <= 1)
+                    if abs(w) > threshold:
+                        summands.append(Times(Real(float(w)),
+                                             prv[j]))
+
+                if len(summands) > 0:
+                    # init variables
+                    aux = Symbol(f'a_{l*2}_{i}', REAL)
+                    out = Symbol(f'h_{l*2}_{i}', REAL)
+                    nxt.append(out)
+
+                    b = self.network[l*2].bias[i]; assert(b <= 1)
+                    lincomb = Plus(*summands, Real(float(b)))
+
+                    formula.append(Equals(aux, lincomb))
+                    formula.append(Ite(LE(Real(0), aux),
+                                       Equals(out, aux),
+                                       Equals(out, Real(0))))
+                    formula.append(LE(Real(0), out))
+                    formula.append(LE(aux, out))
 
             prv = nxt
 
@@ -84,7 +95,7 @@ class ReluNet(ModulePlus):
             self.output_vars.append(outvar)
             formula = formula.substitute({hvar : outvar})
 
-        self.formula = formula
+        return formula
 
 
 if __name__ == '__main__':
