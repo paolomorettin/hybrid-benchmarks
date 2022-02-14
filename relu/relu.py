@@ -58,7 +58,6 @@ class ReluNet(ModulePlus):
             nxt = []
             # for each neuron in layer
             for i in range(self.network[l*2].weight.size()[0]):
-
                 # compute coefficients
                 summands = []                
                 for j in range(len(prv)): # for each input to the l-th layer
@@ -80,6 +79,8 @@ class ReluNet(ModulePlus):
                     formula.append(Ite(LE(Real(0), aux),
                                        Equals(out, aux),
                                        Equals(out, Real(0))))
+                    formula.append(Not(And(Equals(out, aux),
+                                        Equals(out, Real(0)))))
                     formula.append(LE(Real(0), out))
                     formula.append(LE(aux, out))
 
