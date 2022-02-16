@@ -1,10 +1,29 @@
 from det import DET
 import numpy as np
 import os
-from pysmt.shortcuts import BOOL, REAL, Symbol, reset_env
+from pysmt.shortcuts import BOOL, LE, Plus, REAL, Real, Symbol, Times, reset_env
 from pywmi import Density
+from scipy.linalg import solve as solve_linear_system
 from string import ascii_letters
 from sys import argv
+
+
+
+def sample_uniform_hyperplane(polytope):
+    nvars = len(polytope[0]) - 1
+
+    # uniformly sampled point inside the polytope
+    p = sample_uniform_point(polytope)
+
+    # uniformly sampled orientation for the hyperplane
+    o = np.random.uniform(0, 1, (nvars-1, nvars))
+
+    # coefficients for the system of equations (i.e. n points in n dimensions)
+    Points = p * np.concatenate((np.ones((1, nvars)), o))
+
+    # solving the system to retrieve the hyperplane's coefficients
+    # [p1 ; ... , pn] * coeffs = 1
+    return solve_linear_system(Points, np.ones((nvars, 1))).transpose()
 
 def read_feats(path):
     feats = []
@@ -81,13 +100,13 @@ DATAFOLDER = 'mlc-datasets'
 
 
 
-if len(argv) != 3:
-    print("Usage: python3 generate_mlc.py N_MIN N_MAX")
+if len(argv) != 5:
+    print("Usage: python3 generate_dets.py N_MIN N_MAX NQUERIES SEED")
     exit(1)
 
-nmin, nmax = int(argv[1]), int(argv[2])
+nmin, nmax, nqueries, seed = int(argv[1]), int(argv[2]), int(argv[3]), int(argv[4])
 
-benchmark_folder = f'mlc-{nmin}-{nmax}'
+benchmark_folder = f'dets-{nmin}-{nmax}-{seed}'
 
 if not os.path.isdir(benchmark_folder):
     os.mkdir(benchmark_folder)
@@ -97,7 +116,7 @@ for exp in EXPERIMENTS:
     # fresh pysmt environment
     reset_env()
     
-    detfile = os.path.join(benchmark_folder, f'det-{exp}-{nmin}-{nmax}.json')
+    detfile = os.path.join(benchmark_folder, f'{exp}-{nmin}-{nmax}.json')
 
     if os.path.isfile(detfile):
         print(f"{detfile} exists. Skipping.")
@@ -116,8 +135,26 @@ for exp in EXPERIMENTS:
     det.grow_full_tree(train)
     det.prune_with_validation(valid)
 
-    domain, support, weight = det.to_pywmi()
-    queries = [] # No queries for now
+    domain, support, weight = det.to_pywmi()    
+    queries = []
+    for i in range(nqueries):
+        np.random.seed(seed+i)
+        bbox = [domain.var_domains[v] for v in domain.real_vars]
+        nvars = len(bbox)
+        p = np.array([np.random.uniform(l, u) for l, u in bbox])
+        # uniformly sampled orientation for the hyperplane
+        o = np.random.uniform(0, 1, (nvars-1, nvars))
+        # coefficients for the system of equations (i.e. n points in ndimensions)
+        Points = p * np.concatenate((np.ones((1, nvars)), o))
+
+        # solving the system to retrieve the hyperplane's coefficients
+        # [p1 ; ... , pn] * coeffs = 1
+        w = solve_linear_system(Points, np.ones((nvars, 1))).transpose()[0]
+        wx = [Times(Real(float(w[j])), x)
+              for j,x in enumerate(domain.get_real_symbols())]
+        query = LE(Plus(*wx), Real(1))
+        queries.append(query)
+    
     density = Density(domain, support, weight, queries)
 
     density.to_file(detfile)  # Save to file
