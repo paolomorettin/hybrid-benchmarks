@@ -35,13 +35,13 @@ DATAFOLDER = 'mlc-datasets'
 
 
 
-if len(argv) != 5:
-    print("Usage: python3 generate_dets.py N_MIN N_MAX NQUERIES SEED")
+if len(argv) != 6:
+    print("Usage: python3 generate_dets.py N_MIN N_MAX NQUERIES QUERYHARDNESS SEED")
     exit(1)
 
-nmin, nmax, nqueries, seed = int(argv[1]), int(argv[2]), int(argv[3]), int(argv[4])
+nmin, nmax, nqueries, qhardness, seed = int(argv[1]), int(argv[2]), int(argv[3]), float(argv[4]), int(argv[5])
 
-benchmark_folder = f'dets-{nmin}-{nmax}-{seed}'
+benchmark_folder = f'dets-{nmin}-{nmax}-{nqueries}-{qhardness}-{seed}'
 
 if not os.path.isdir(benchmark_folder):
     os.mkdir(benchmark_folder)
@@ -70,7 +70,7 @@ for exp in EXPERIMENTS:
     det.grow_full_tree(train)
     det.prune_with_validation(valid)
 
-    domain, support, weight = det.to_pywmi()    
+    domain, support, weight = det.to_pywmi()
     queries = []
     for i in range(nqueries):
         np.random.seed(seed+i)
@@ -85,8 +85,15 @@ for exp in EXPERIMENTS:
         # solving the system to retrieve the hyperplane's coefficients
         # [p1 ; ... , pn] * coeffs = 1
         w = solve_linear_system(Points, np.ones((nvars, 1))).transpose()[0]
+
+        # consider a subset maybe?
+        selected = np.random.choice(nvars, int(nvars*qhardness), replace=False)
+        if len(selected) == 0:
+            selected = [np.random.choice(nvars)]
+
         wx = [Times(Real(float(w[j])), x)
-              for j,x in enumerate(domain.get_real_symbols())]
+              for j,x in enumerate(domain.get_real_symbols())
+              if j in selected]
         query = LE(Plus(*wx), Real(1))
         queries.append(query)
     
