@@ -2,6 +2,21 @@
 import torch
 from pysmt.shortcuts import *
 
+class Dataset(torch.utils.data.Dataset):
+
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels        
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        x = torch.tensor(self.data[idx], dtype=torch.float32)
+        y = torch.tensor(self.labels[idx], dtype=torch.float32)
+        return x, y
+
+
 class ModulePlus(torch.nn.Module):
 
     def __init__(self, seed):
@@ -34,6 +49,12 @@ class ReluNet(ModulePlus):
 
     def forward(self, x):
         return self.network(x)
+
+    def train(self, data):
+        pass
+
+    def test(self, data):
+        pass
 
 
     def to_smt(self, threshold=0.0):
@@ -85,9 +106,6 @@ class ReluNet(ModulePlus):
                     formula.append(LE(aux, out))
 
             prv = nxt
-
-        for clause in formula:
-            print('   ', serialize(clause))
 
         formula = And(*formula)
         self.output_vars = []        

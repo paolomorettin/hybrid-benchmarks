@@ -2,7 +2,10 @@
 from det import DET
 import numpy as np
 import numpy.random as rng
-from relu import ReluNet
+from pysmt.shortcuts import *
+from relu import Dataset, ReluNet
+import torch
+from torch.utils.data import DataLoader
 
 
 def sample_from_prior(probcl, meancl, stdcl, nsamples, seed):
@@ -20,24 +23,59 @@ def sample_from_prior(probcl, meancl, stdcl, nsamples, seed):
 
     return np.array(samples)
 
+def train(dataloader, model, loss_fn, optimizer, device="cpu"):
+    train_loss = 0
+    i = 0
+    for X, y in dataloader:
+        
+        X, y = X.to(device), y.to(device)
+
+        # Compute prediction error
+        pred = model(X)
+        loss = loss_fn(pred, y)
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        train_loss += loss.item()            
+        i += 1
+
+    train_loss /= len(dataloader)
+    return train_loss
 
 
-def generate_constraints(nx, ny, seed):
-    rng.seed(seed)
-    constraints = []
-    indices = rng.choice(ny, nx)
-    for i in range(ny):
-        lincomb = []
-        for j in range(nx):
-            if indices[j] == i:
-                k = rng.uniform()
-                lincomb.append((xj, k))
+def test(dataloader, model, loss_fn, device="cpu"):
+    model.eval()
+    test_loss = 0
+    with torch.no_grad():
+        for X, y in dataloader:
+            X, y = X.to(device), y.to(device)
+            pred = model(X)
+            test_loss += loss_fn(pred, y).item()
 
-        constraints.append(lincomb)
+    test_loss /= len(dataloader)
+    return test_loss
 
-    return constraints
-                
-                
+
+def run(train_dataloader, test_dataloader, max_epochs, model, loss_fn,
+        optimizer, device):
+
+    train_losses, test_losses = [], []
+    for t in range(max_epochs):
+        train_l = train(train_dataloader, model, loss_fn, optimizer, device)
+        test_l = test(test_dataloader, model, loss_fn, device)
+        train_losses.append(train_l)
+        test_losses.append(test_l)
+        if t % (max_epochs / 100) == 0:
+            print(f"Epoch {t+1}\n-------------------------------")
+            print("Train loss", train_l)
+            print("Test loss", test_l)
+
+    return train_losses, test_losses
+
+
 
 if __name__ == '__main__':
 
@@ -47,44 +85,82 @@ if __name__ == '__main__':
     xdim = 3
     ydim = 2
     ncl = 2
-
-    # relunet
-    hiddendim = 32
-    reludim = (xdim, hiddendim, ydim)
-    nn_train = 1000
-    nn_test = 100
-    nepochs = 100
-    threshold = 0.0
-
-    # prior model
-    nmin = 10
-    nmax = 50
-    det_train = 5000
-    det_valid = 500
-    
+    epsilon = 1e-2
 
     rng.seed(seed)
-    # Gaussian mixture as a prior
+
+    print('Generating a Gaussian mixture as true prior P*(X)')
     wcl = rng.uniform(size=ncl)
     probcl = wcl/np.sum(wcl)
     meancl = [rng.uniform(size=xdim) for _ in range(ncl)]
     stdcl = [rng.uniform(size=xdim) for _ in range(ncl)]
 
-
-    # linear constraints
+    print('Generating linear constraints c: (Y = cX)')
     constraints = rng.uniform(size=(xdim, ydim))
 
-    # sampling from prior
-    train_x = sample_from_prior(probcl, meancl, stdcl,
-                                nn_train + nn_test, seed)
+    print('Training a Relunet on labelled data (Xt, Yt)')
 
-    #labelling the training data
+    # relunet
+    hiddendim = 32
+    reludim = (xdim, hiddendim, ydim)
+    nn_trainsize = 1000
+    nn_testsize = 100
+    nepochs = 100
+    batch_size = 10
+    lr = 1e-3
+    loss = torch.nn.MSELoss()
+    threshold = 0.0
+
+    # sampling Xt ~ P*(X)
+    sample = sample_from_prior(probcl, meancl, stdcl,
+                               nn_trainsize + nn_testsize, seed)
+
+    #labelling Yt = Xt * c
+    train_x = sample[:nn_trainsize]
+    test_x = sample[nn_trainsize:]
     train_y = np.matmul(train_x, constraints)
-    nn_data = np.concatenate((train_x, train_y), axis=1)
+    test_y = np.matmul(test_x, constraints)
 
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        rng.seed(worker_seed)
+        random.seed(worker_seed) # dunno
+
+    g = torch.Generator()
+    g.manual_seed(0)
+
+    train_dl = DataLoader(Dataset(train_x, train_y),
+                          batch_size=batch_size,
+                          worker_init_fn=seed_worker,
+                          generator=g)
+    test_dl = DataLoader(Dataset(test_x, test_y),
+                         batch_size=batch_size,
+                         worker_init_fn=seed_worker,
+                         generator=g)
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = 'cpu'
     relunet = ReluNet(reludim, seed)
-    relunet.train(nn_data[:nn_train])
-    relunet.test(nn_data[nn_train:])    
+    optimizer = torch.optim.SGD(relunet.parameters(), lr=lr)    
+    train_losses, test_losses = run(train_dl,
+                                    test_dl,
+                                    nepochs,
+                                    relunet,
+                                    loss,
+                                    optimizer,
+                                    device)
+
+
+    # encode the trained NN in SMT
+    smt_relu = relunet.to_smt(threshold)
+
+    print('Estimating P*(X) with DET trained on Xe ~ P*(X)')
+
+    # Estimating P*(X)
+    nmin = 10
+    nmax = 50
+    det_train = 5000
+    det_valid = 500
 
     # fitting a model on a unlabelled dataset
     det_data = sample_from_prior(probcl, meancl, stdcl,
@@ -93,6 +169,19 @@ if __name__ == '__main__':
     det = DET(feats, nmin, nmax)
     det.grow_full_tree(det_data[:det_train])
     det.prune_with_validation(det_data[det_train:])
-
     
-    smt_relu = relunet.to_smt(threshold)
+    domain, smt_det, weight_det = det.to_pywmi()
+
+    # generate queries
+    queries = []
+    for i, yi in enumerate(relunet.output_vars):
+        ci = constraints[:,i]
+        wc = Plus(*[Times(Real(float(ci[j])), xj)
+                    for j,xj in enumerate(relunet.input_vars)])
+        lower = LE(Plus(yi, Real(epsilon)), wc)
+        upper = LE(wc, Minus(yi, Real(epsilon)))
+        queries.append(And(lower, upper))
+                   
+        
+    
+    
