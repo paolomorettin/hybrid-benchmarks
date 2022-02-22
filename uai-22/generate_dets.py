@@ -9,22 +9,6 @@ from sys import argv
 from utils import read_feats, read_data
 
 
-def sample_uniform_hyperplane(polytope):
-    nvars = len(polytope[0]) - 1
-
-    # uniformly sampled point inside the polytope
-    p = sample_uniform_point(polytope)
-
-    # uniformly sampled orientation for the hyperplane
-    o = np.random.uniform(0, 1, (nvars-1, nvars))
-
-    # coefficients for the system of equations (i.e. n points in n dimensions)
-    Points = p * np.concatenate((np.ones((1, nvars)), o))
-
-    # solving the system to retrieve the hyperplane's coefficients
-    # [p1 ; ... , pn] * coeffs = 1
-    return solve_linear_system(Points, np.ones((nvars, 1))).transpose()
-
 
 # full MLC suite sorted by increasing number of features
 EXPERIMENTS = {'small' : ['balance-scale', 'iris', 'cars', 'diabetes', 'breast-cancer',
