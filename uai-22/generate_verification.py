@@ -130,7 +130,7 @@ if __name__ == '__main__':
     probcl = wcl/np.sum(wcl)
     meancl = [rng.uniform(-1, +1, size=xdim) for _ in range(ncl)]
     stdcl = [rng.uniform(0, 1, size=xdim) for _ in range(ncl)]
-
+    
     constraints = []
     for i in range(nhyper):
         bbox = [(-1, +1) for _ in range(xdim)]
@@ -145,23 +145,94 @@ if __name__ == '__main__':
         w = solve_linear_system(Points, np.ones((xdim, 1))).transpose()[0]
         lincomb = rng.uniform(size=(xdim, ydim))
         constraints.append((w, lincomb))
+
+    input_vars = [Symbol(f'x_{i}', REAL) for i in range(xdim)]
+    output_vars = [Symbol(f'y_{i}', REAL) for i in range(ydim)]    
+    queries = []
+    for mu in prod(*[[True, False] for _ in range(nhyper)]):
+        cond = []
+        lincomb = np.ones((xdim, ydim))
+        for i, constr in enumerate(constraints):
+            w, lc = constr
+            h_smt = Plus(*[Times(Real(float(w[j])), xj)
+                           for j,xj in enumerate(input_vars)])
+
+            c_smt = LE(h_smt, Real(1))
+
+            if mu[i]:
+                lincomb *= lc
+            else:
+                c_smt = Not(c_smt)
+                
+            cond.append(c_smt)
+            
+        for i, yi in enumerate(output_vars):
+            ci = lincomb[:,i]
+            wc = Plus(*[Times(Real(float(ci[j])), xj)
+                        for j,xj in enumerate(input_vars)])
+            lower = LE(wc, Plus(yi, Real(epsilon)))
+            upper = LE(yi, Plus(wc, Real(epsilon)))
+            queries.append((And(*cond), And(lower, upper)))
+
+    # Estimating P*(X)
+    nmin = 100
+    nmax = 200
+    det_train = 1000
+    det_valid = 100
+
+    print("--------------------------------------------------")
+    print('Estimating P*(X) with DET trained on Xe ~ P*(X)')
+    print("with:")
+    print(f" Min. leaf size - {nmin}\n Max. leaf size - {nmax}")
+    print(f" Training data - {det_train}\n Validation data - {det_valid}")
+    print()
+    
+    detstr = f'det-{nmin}-{nmax}-{det_train}-{det_valid}'
+    dns_det_path = os.path.join(benchmark_folder, f'dns_{detstr}.json')
+    if os.path.isfile(dns_det_path):
+        print("Found density:", dns_det_path)
+        print()
+        dns_det = Density.from_file(dns_det_path)
+        domain = dns_det.domain
+        smt_det = dns_det.support
+        weight_det = dns_det.weight
+    else:
+
+        # fitting a model on a unlabelled dataset
+        det_data = sample_from_prior(probcl, meancl, stdcl,
+                                 det_train + det_valid, seed+1)
+        feats = input_vars
+        det = DET(feats, nmin, nmax)
+        det.grow_full_tree(det_data[:det_train])
+        det.prune_with_validation(det_data[det_train:])
+        domain, smt_det, weight_det = det.to_pywmi()
+        dns_det = Density(domain, smt_det, weight_det, [])
+        dns_det.to_file(dns_det_path)
     
     # relunet
     hiddendim = 8 #32
-    reludim = (xdim, hiddendim, ydim)
+    reludim = (xdim, nhyper, hiddendim, ydim)
+    dimstr = str(reludim).replace(' ','')
     nn_trainsize = 10000
     nn_testsize = 1000
-    nepochs = 100
+    nepochs = 1000
     batch_size = 100
     lr = 1e-3
     loss = torch.nn.MSELoss()
     threshold = 0.0
 
-    dimstr = str(reludim).replace(' ','')
-    nnstr = f'model-{dimstr}-{nn_trainsize}-{nepochs}-{batch_size}-{lr}'
-    relupath = os.path.join(benchmark_folder, nnstr + '.pth')
-
     relunet = ReluNet(reludim, seed)
+    smt_relu_init = relunet.to_smt(threshold)
+
+    # encode the trained NN and DET in SMT
+    for v in smt_relu_init.get_free_variables():
+        if v not in input_vars:
+            vname = v.symbol_name()
+            domain.variables.append(vname)
+            domain.var_domains[vname] = (-np.inf, +np.inf)
+            domain.var_types[vname] = REAL
+
+    
     print("--------------------------------------------------")
     print("Training the Relunet")
     print("with:")
@@ -170,6 +241,8 @@ if __name__ == '__main__':
     print(f" Learning rate - {lr}")
     print()
 
+    nnstr = f'model-{dimstr}-{nn_trainsize}-{nepochs}-{batch_size}-{lr}'
+    relupath = os.path.join(benchmark_folder, nnstr + '.pth')
     if os.path.isfile(relupath):
         print("Found model:", relupath)
         print()
@@ -237,86 +310,33 @@ if __name__ == '__main__':
         plotpath = os.path.join(benchmark_folder, nnstr + '.png')
         plot_losses(train_loss, test_loss, path=plotpath)
 
-    # Estimating P*(X)
-    nmin = 100
-    nmax = 200
-    det_train = 1000
-    det_valid = 100
-    detstr = f'det-{nmin}-{nmax}-{det_train}-{det_valid}'
-
-    print("--------------------------------------------------")
-    print('Estimating P*(X) with DET trained on Xe ~ P*(X)')
-    print("with:")
-    print(f" Min. leaf size - {nmin}\n Max. leaf size - {nmax}")
-    print(f" Training data - {det_train}\n Validation data - {det_valid}")
-    print()
-
-    densitystr = f'density_{nnstr}_{detstr}'
-    densitypath = os.path.join(benchmark_folder, densitystr + '.json')
-
-    if os.path.isfile(densitypath):
-        print("Found density:", densitypath)
-        print()
-        density = Density.from_file(densitypath)
-    else:
-        # fitting a model on a unlabelled dataset
-        det_data = sample_from_prior(probcl, meancl, stdcl,
-                                     det_train + det_valid, seed+1)
-        smt_relu_trained = relunet.to_smt(threshold)
-        feats = relunet.input_vars
-        det = DET(feats, nmin, nmax)
-        det.grow_full_tree(det_data[:det_train])
-        det.prune_with_validation(det_data[det_train:])
-
-        # encode the trained NN and DET in SMT
-        domain, smt_det, weight_det = det.to_pywmi()        
-        for v in smt_relu_trained.get_free_variables():
-            if v not in feats:
-                vname = v.symbol_name()
-                domain.variables.append(vname)
-                domain.var_domains[vname] = (-np.inf, +np.inf)
-                domain.var_types[vname] = REAL
-        
-        queries = []
-        for mu in prod(*[[True, False] for _ in range(nhyper)]):
-            cond = []
-            lincomb = np.ones((xdim, ydim))
-            for i, constr in enumerate(constraints):
-                w, lc = constr
-                h_smt = Plus(*[Times(Real(float(w[j])), xj)
-                               for j,xj in enumerate(relunet.input_vars)])
-
-                c_smt = LE(h_smt, Real(1))
-
-                if mu[i]:
-                    lincomb *= lc
-                else:
-                    c_smt = Not(c_smt)
-                
-                cond.append(c_smt)
-            
-            for i, yi in enumerate(relunet.output_vars):
-                ci = lincomb[:,i]
-                wc = Plus(*[Times(Real(float(ci[j])), xj)
-                            for j,xj in enumerate(relunet.input_vars)])
-                lower = LE(wc, Plus(yi, Real(epsilon)))
-                upper = LE(yi, Plus(wc, Real(epsilon)))
-                queries.append(And(*cond, lower, upper))
-                #queries.append(And(*cond))
-
-        density = Density(domain,
-                          And(smt_relu_trained, smt_det),
-                          weight_det,
-                          queries)
-        density.to_file(densitypath)  # Save to file
-    
+    smt_relu_trained = relunet.to_smt(threshold)        
 
     for mode in ["PAEUFTA"]:
-        wmi = WMI(density.support, density.weight)
         print(f"Verifying with WMI-{mode}")
-        for i, q in enumerate(density.queries):
-            vol, nint = wmi.computeWMI(q, mode=mode)
-            print(f"{i} VOL:", vol)
-            print(f"{i} INT:", nint)
+        vole = []
+        wmi = WMI(smt_det, weight_det)
+        for qe in queries:
+            vole.append(wmi.computeWMI(qe[0], mode=mode)[0])
+
+        print('sum(vol[evidence]):', sum(vole))
+        
+        print("--------------------------------------------------")
+        print("BEFORE TRAINING\n")
+        wmi = WMI(And(smt_relu_init, smt_det), weight_det)
+        for i, qe in enumerate(queries):
+            vol, nint = wmi.computeWMI(And(*qe), mode=mode)
+            print(f"{i} Pr:", vol/vole[i])
+            print(f"{i} N.int:", nint)
             print()
+
+        print("AFTER TRAINING\n")
+        wmi = WMI(And(smt_relu_trained, smt_det), weight_det)
+        for i, qe in enumerate(queries):
+            vol, nint = wmi.computeWMI(And(*qe), mode=mode)
+            print(f"{i} Pr:", vol/vole[i])
+            print(f"{i} N.int:", nint)
+            print()
+
+
     
