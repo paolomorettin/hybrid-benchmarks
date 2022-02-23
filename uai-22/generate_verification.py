@@ -11,6 +11,7 @@ from relu import Dataset, ReluNet
 from scipy.linalg import solve as solve_linear_system
 import torch
 from torch.utils.data import DataLoader
+from wmipa import WMI
 
 def plot_losses(train_loss, test_loss, title="", ylabel="Loss", path=None):
     xs = range(1,len(train_loss)+1)
@@ -108,7 +109,7 @@ if __name__ == '__main__':
     xdim = 3
     ydim = 1
     ncl = 3
-    epsilon = 1e-2
+    epsilon = 0.2
     nhyper = 2
 
 
@@ -146,11 +147,11 @@ if __name__ == '__main__':
         constraints.append((w, lincomb))
     
     # relunet
-    hiddendim = 32 #32
+    hiddendim = 8 #32
     reludim = (xdim, hiddendim, ydim)
     nn_trainsize = 10000
     nn_testsize = 1000
-    nepochs = 1000
+    nepochs = 100
     batch_size = 100
     lr = 1e-3
     loss = torch.nn.MSELoss()
@@ -192,7 +193,7 @@ if __name__ == '__main__':
                 
             y = np.matmul(x, c)
             train_y.append(y)
-        
+
         test_y = []
         for x in test_x:
             c = np.ones((xdim, ydim))
@@ -237,8 +238,8 @@ if __name__ == '__main__':
         plot_losses(train_loss, test_loss, path=plotpath)
 
     # Estimating P*(X)
-    nmin = 10
-    nmax = 50
+    nmin = 100
+    nmax = 200
     det_train = 1000
     det_valid = 100
     detstr = f'det-{nmin}-{nmax}-{det_train}-{det_valid}'
@@ -261,20 +262,27 @@ if __name__ == '__main__':
         # fitting a model on a unlabelled dataset
         det_data = sample_from_prior(probcl, meancl, stdcl,
                                      det_train + det_valid, seed+1)
-        smt_relu = relunet.to_smt(threshold)
+        smt_relu_trained = relunet.to_smt(threshold)
         feats = relunet.input_vars
         det = DET(feats, nmin, nmax)
         det.grow_full_tree(det_data[:det_train])
         det.prune_with_validation(det_data[det_train:])
 
         # encode the trained NN and DET in SMT
-        domain, smt_det, weight_det = det.to_pywmi()    
+        domain, smt_det, weight_det = det.to_pywmi()        
+        for v in smt_relu_trained.get_free_variables():
+            if v not in feats:
+                vname = v.symbol_name()
+                domain.variables.append(vname)
+                domain.var_domains[vname] = (-np.inf, +np.inf)
+                domain.var_types[vname] = REAL
+        
         queries = []
         for mu in prod(*[[True, False] for _ in range(nhyper)]):
             cond = []
             lincomb = np.ones((xdim, ydim))
-            for w, lc in constraints:
-
+            for i, constr in enumerate(constraints):
+                w, lc = constr
                 h_smt = Plus(*[Times(Real(float(w[j])), xj)
                                for j,xj in enumerate(relunet.input_vars)])
 
@@ -286,18 +294,29 @@ if __name__ == '__main__':
                     c_smt = Not(c_smt)
                 
                 cond.append(c_smt)
-
+            
             for i, yi in enumerate(relunet.output_vars):
                 ci = lincomb[:,i]
                 wc = Plus(*[Times(Real(float(ci[j])), xj)
                             for j,xj in enumerate(relunet.input_vars)])
-                lower = LE(Plus(yi, Real(epsilon)), wc)
-                upper = LE(wc, Minus(yi, Real(epsilon)))
+                lower = LE(wc, Plus(yi, Real(epsilon)))
+                upper = LE(yi, Plus(wc, Real(epsilon)))
                 queries.append(And(*cond, lower, upper))
-    
+                #queries.append(And(*cond))
+
         density = Density(domain,
-                          And(smt_relu, smt_det),
+                          And(smt_relu_trained, smt_det),
                           weight_det,
                           queries)
         density.to_file(densitypath)  # Save to file
+    
+
+    for mode in ["PAEUFTA"]:
+        wmi = WMI(density.support, density.weight)
+        print(f"Verifying with WMI-{mode}")
+        for i, q in enumerate(density.queries):
+            vol, nint = wmi.computeWMI(q, mode=mode)
+            print(f"{i} VOL:", vol)
+            print(f"{i} INT:", nint)
+            print()
     
