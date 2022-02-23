@@ -50,12 +50,6 @@ class ReluNet(ModulePlus):
     def forward(self, x):
         return self.network(x)
 
-    def train(self, data):
-        pass
-
-    def test(self, data):
-        pass
-
 
     def to_smt(self, threshold=0.0):
 
@@ -93,7 +87,7 @@ class ReluNet(ModulePlus):
                     out = Symbol(f'h_{l*2}_{i}', REAL)
                     nxt.append(out)
 
-                    b = self.network[l*2].bias[i]; assert(b <= 1)
+                    b = self.network[l*2].bias[i]#; assert(b <= 1)
                     lincomb = Plus(*summands, Real(float(b)))
 
                     formula.append(Equals(aux, lincomb))
