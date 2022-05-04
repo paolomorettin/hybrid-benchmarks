@@ -26,9 +26,9 @@ if len(argv) != 6:
 
 nmin, nmax, nqueries, qhardness, seed = int(argv[1]), int(argv[2]), int(argv[3]), float(argv[4]), int(argv[5])
 
-
+rows = ['\\hline', 'Dataset & $|\\allA|$ & $|\\allX|$ & \\# Train & \\# Valid\\\\', '\\hline']
 for size in EXPERIMENTS:
-    benchmark_folder = f'{size}-dets-{nmin}-{nmax}-{nqueries}-{qhardness}-{seed}'
+    benchmark_folder = f'dets-{size}-{nmin}-{nmax}-{nqueries}-{qhardness}-{seed}'
 
     if not os.path.isdir(benchmark_folder):
         os.mkdir(benchmark_folder)
@@ -48,6 +48,12 @@ for size in EXPERIMENTS:
         feats = read_feats(featfile)
         train = read_data(os.path.join(DATAFOLDER, f'{exp}.train.data'), feats)
         valid = read_data(os.path.join(DATAFOLDER, f'{exp}.valid.data'), feats)
+
+        nbools = len([v for v in feats if v.symbol_type() == BOOL])
+        nreals = len([v for v in feats if v.symbol_type() == REAL])
+        rows.append(f'{exp} & {nbools} & {nreals} & {len(train)} & {len(valid)} \\\\')
+
+
 
         print(f"{exp} : Learning DET({nmin},{nmax})")
         det = DET(feats, nmin, nmax)
@@ -92,8 +98,8 @@ for size in EXPERIMENTS:
         density.to_file(detfile)  # Save to file
         # density = Density.from_file(filename)  # Load from file
 
-    
-
+with open('table.tex', 'w') as f:
+    f.write('\n'.join(rows))
 
 
 
