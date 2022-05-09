@@ -16,31 +16,37 @@ from utils import read_feats, read_data
 
 
 def recw(node):
-    if isinstance(node, Sum):
-        return Plus(*[Times(Real(node.weights[i]), recw(c))
-                      for i,c in enumerate(node.children)])
-    elif isinstance(node, Product):
-        return Times(*[recw(c) for c in node.children])
+    if isinstance(node, Sum) or isinstance(node, Product):
+        ch_res = [recw(c) for c in node.children]
+        count = sum(res[1] for res in ch_res)
+
+        if isinstance(node, Sum):
+            w = Plus(*[Times(Real(node.weights[i]), res[0])
+                       for i, res in enumerate(ch_res)])        
+        else:
+            w = Times(*[res[0] for res in ch_res])
     else:
         assert(len(node.scope) == 1)
+        count = 1
         var = feats[node.scope[0]]
         if var.symbol_type() == BOOL:
             assert(len(node.densities) == 2)
-            ite = Ite(var,
-                      Real(node.densities[1]),
-                      Real(node.densities[0]))
+            w = Ite(var,
+                    Real(node.densities[1]),
+                    Real(node.densities[0]))
         else:
             intervals = [And(LE(Real(node.breaks[i]), var),
                              LT(var, Real(node.breaks[i+1])))
                          for i in range(len(node.densities))]
-            ite = Ite(intervals[0],
+            w = Ite(intervals[0],
                       Real(node.densities[0]),
                       Real(1-sum(node.densities)))
             for i in range(1, len(intervals)):
-                ite = Ite(intervals[i],
+                w = Ite(intervals[i],
                           Real(node.densities[i]),
-                          ite)
-        return ite
+                          w)
+
+    return w, count
 
 
 
@@ -102,7 +108,10 @@ for nm in range(nmodels):
             bvars.append(var.symbol_name())
 
     support = And(*clauses)
-    weight = recw(mspn)
+    weight, nnodes = recw(mspn)
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print("NUMBER OF NODES:", nnodes)
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++")
     domain = Domain.make(bvars, cvars, cbounds)
         
     queries = []
