@@ -4,10 +4,12 @@ import os
 from pysmt.shortcuts import *
 from pywmi import Density, Domain
 from scipy.linalg import solve as solve_linear_system
+from spn.algorithms.LearningWrappers import learn_mspn
+from spn.structure.leaves.histogram.Histograms import create_histogram_leaf
+from spn.structure.leaves.piecewise.PiecewiseLinear import create_piecewise_leaf
 from spn.structure.Base import Context
 from spn.structure.Base import Sum, Product
 from spn.structure.StatisticalTypes import MetaType
-from spn.algorithms.LearningWrappers import learn_mspn
 from sys import argv
 from utils import read_feats, read_data
 
@@ -57,6 +59,8 @@ if len(argv) != 5:
 
 mininstslices, nqueries, qhardness, seed = int(argv[1]), int(argv[2]), float(argv[3]), int(argv[4])
 
+pwleaves = False
+
 for size in EXPERIMENTS:
     benchmark_folder = f'{size}-mspns-{mininstslices}-{nqueries}-{qhardness}-{seed}'
 
@@ -66,7 +70,7 @@ for size in EXPERIMENTS:
     for exp in EXPERIMENTS[size]:
         # fresh pysmt environment
         reset_env()
-    
+
         mspnfile = os.path.join(benchmark_folder, f'{exp}-{mininstslices}.json')
 
         if os.path.isfile(mspnfile):
@@ -80,28 +84,24 @@ for size in EXPERIMENTS:
         valid = read_data(os.path.join(DATAFOLDER, f'{exp}.valid.data'), feats)
 
         print(f"{exp} : Learning MSPN({mininstslices})")
-        mtypes = [MetaType.DISCRETE
+        mtypes = [MetaType.BINARY
                   if (f.symbol_type() == BOOL)
                   else MetaType.REAL
                   for f in feats]
         ds_context = Context(meta_types=mtypes)
         ds_context.add_domains(train)
-        mspn = learn_mspn(train, ds_context, min_instances_slice=mininstslices)
-        '''
-        size = 100
-        a = np.random.randint(2, size=size).reshape(-1, 1)
-        b = np.random.randint(3, size=size).reshape(-1, 1)
-        c = np.r_[np.random.normal(10, 5, (int(size/2), 1)), np.random.normal(20, 10, (size - int(size/2), 1))]
-        d = 5 * a + 3 * b + c
-        train_data = np.c_[a, b, c, d]
-        ds_context = Context(meta_types=[MetaType.DISCRETE, MetaType.DISCRETE, MetaType.REAL, MetaType.REAL])
-        ds_context.add_domains(train_data)
-        mspn = learn_mspn(train_data,
-                          ds_context,
-                          min_instances_slice=mininstslices)
+        leafop = create_piecewise_leaf if pwleaves else create_histogram_leaf
 
-        print("done")
-        '''
+        nfeats = 2
+        feats = [Symbol(f'X{i}', REAL) for i in range(1, nfeats+1)]
+        train = np.random.random(size=500*nfeats).reshape(-1, nfeats)
+        ds_context = Context(meta_types=[MetaType.REAL for _ in range(train.shape[-1])])
+        ds_context.add_domains(train)
+        mspn = learn_mspn(train, ds_context,
+                          min_instances_slice=mininstslices,
+                          leaves=leafop,
+                          cpus=1)
+
         clauses = []
         bvars = []
         cvars = []

@@ -29,6 +29,14 @@ def recw(node):
         assert(len(node.scope) == 1)
         count = 1
         var = feats[node.scope[0]]
+
+        print('---')
+        print('leaf of type', var.symbol_type())
+        print('histogram', node.densities)
+        print('sum(histogram)', sum(node.densities))
+        print('1-sum(histogram)', 1-sum(node.densities))
+        print()
+
         if var.symbol_type() == BOOL:
             assert(len(node.densities) == 2)
             w = Ite(var,
@@ -116,7 +124,7 @@ for nm in range(nmodels):
         
     queries = []
     i = 0
-    np.random.seed(seed)
+
     while i < nqueries:
         bbox = [domain.var_domains[v] for v in domain.real_vars]
         nvars = len(bbox)
