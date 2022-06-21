@@ -16,7 +16,7 @@ EXPERIMENTS = {'small' : ['balance-scale', 'iris', 'cars', 'diabetes', 'breast-c
                'big' : ['heart', 'australian', 'crx', 'german', 'german-org', 'auto',
                         'anneal-U']}
 
-DATAFOLDER = 'mlc-datasets'
+DATAFOLDER = '../data/mlc-datasets'
 
 
 
