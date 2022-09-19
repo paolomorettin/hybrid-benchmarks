@@ -3,6 +3,14 @@ import numpy as np
 from pysmt.shortcuts import BOOL, LE, Plus, REAL, Real, Symbol, Times, reset_env
 from string import ascii_letters
 
+# full UCI suite sorted by increasing number of features
+EXPERIMENTS = {'small' : ['balance-scale', 'iris', 'cars', 'diabetes', 'breast-cancer',
+                          'glass2', 'glass', 'breast', 'solar', 'cleve', 'hepatitis'],
+               'big' : ['heart', 'australian', 'crx', 'german', 'german-org', 'auto',
+                        'anneal-U']}
+
+DATAFOLDER = '../data/uci-datasets'
+
 
 def read_feats(path):
     feats = []
