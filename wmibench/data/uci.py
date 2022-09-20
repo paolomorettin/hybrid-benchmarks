@@ -1,7 +1,10 @@
 
 import numpy as np
+import os
 from pysmt.shortcuts import BOOL, LE, Plus, REAL, Real, Symbol, Times, reset_env
 from string import ascii_letters
+
+from wmibench import wmibench_path
 
 # full UCI suite sorted by increasing number of features
 EXPERIMENTS = {'small' : ['balance-scale', 'iris', 'cars', 'diabetes', 'breast-cancer',
@@ -9,7 +12,7 @@ EXPERIMENTS = {'small' : ['balance-scale', 'iris', 'cars', 'diabetes', 'breast-c
                'big' : ['heart', 'australian', 'crx', 'german', 'german-org', 'auto',
                         'anneal-U']}
 
-DATAFOLDER = '../data/uci-datasets'
+DATAFOLDER = os.path.join(wmibench_path, 'data/uci-datasets')
 
 
 def read_feats(path):
@@ -76,3 +79,47 @@ def read_data(path, feats):
                 data.append(row)
 
     return np.array(data)
+
+def uci_latex_table():
+    ''' Generates a LaTeX table with statistics on the dataset.'''
+    
+    rows = ['\\hline', 'Dataset & $|\\allA|$ & $|\\allX|$ & \\# Train & \\# Valid\\\\', '\\hline']
+    for size in EXPERIMENTS:
+        for exp in EXPERIMENTS[size]:
+            featfile = os.path.join(DATAFOLDER, f'{exp}.features')
+            feats = read_feats(featfile)
+            train = read_data(os.path.join(DATAFOLDER, f'{exp}.train.data'), feats)
+            valid = read_data(os.path.join(DATAFOLDER, f'{exp}.valid.data'), feats)
+            nbools = len([v for v in feats if v.symbol_type() == BOOL])
+            nreals = len([v for v in feats if v.symbol_type() == REAL])
+            rows.append(f'{exp} & {nbools} & {nreals} & {len(train)} & {len(valid)} \\\\')
+
+    with open('table.tex', 'w') as f:
+        f.write('\n'.join(rows))
+
+def generate_uci_loop(root_folder, uci_to_pywmi):
+
+    for size in EXPERIMENTS:
+        benchmark_folder = os.path.join(root_folder, f'{size}')
+
+        if not os.path.isdir(benchmark_folder):
+            os.mkdir(benchmark_folder)
+
+        for exp in EXPERIMENTS[size]:
+            # fresh pysmt environment
+            reset_env()
+    
+            detfile = os.path.join(benchmark_folder, f'{exp}.json')
+
+            if os.path.isfile(detfile):
+                print(f"{detfile} exists. Skipping.")
+                continue
+
+            print(f"{exp} : Parsing data")
+            featfile = os.path.join(DATAFOLDER, f'{exp}.features')
+            feats = read_feats(featfile)
+            train = read_data(os.path.join(DATAFOLDER, f'{exp}.train.data'), feats)
+            valid = read_data(os.path.join(DATAFOLDER, f'{exp}.valid.data'), feats)
+            print(f"{exp} : Training model & generating queries")                        
+            density = uci_to_pywmi(feats, train, valid)
+            density.to_file(detfile)  # Save to file    
