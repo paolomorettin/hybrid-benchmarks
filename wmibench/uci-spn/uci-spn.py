@@ -2,7 +2,7 @@
 
 import os
 from pywmi import Density
-from spflow2smt import convert
+from spflow2smt import convert, get_context_from_dataset
 from spn.algorithms.LearningWrappers import learn_parametric
 from spn.structure.Base import Context
 from spn.structure.leaves.parametric.Parametric import Categorical, Gaussian
@@ -14,10 +14,9 @@ from wmibench.data.uci import generate_uci_loop
 def generate(min_instances_slice, nqueries, qhardness, root_folder, seed):
 
     def uci_to_pywmi(feats, train, valid):
-        context = get_context_from_dataset(feats, train)
-        spn = learn_parametric(train_data, context, min_instances_slice=min_instances_slice)
+        context = get_context_from_dataset(feats, train)        
+        spn = learn_parametric(train, context, min_instances_slice=min_instances_slice)
         support, weight, domain = convert(context, spn)
-
         queries = generate_random_queries(domain, nqueries, qhardness, seed,
                                           support=support)            
         density = Density(domain, support, weight, queries)

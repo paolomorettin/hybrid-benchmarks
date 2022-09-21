@@ -9,9 +9,9 @@ from spn.structure.Base import Product as SPNProduct
 from spn.structure.Base import Sum as SPNSum
 
 def get_context_from_dataset(feats, train):
-    types = [Categorical if t is bool else Gaussian
-             for t in feats]
-    return Context(parametric_types=types).add_domains(train_data)
+    types = [Categorical if f.symbol_type() == BOOL  else Gaussian
+             for f in feats]
+    return Context(parametric_types=types).add_domains(train)
 
 def spn_to_weight(spn, smtvars):
     ''' Converts an SPN in SPFlow into a weight function in pysmt.
@@ -19,11 +19,6 @@ def spn_to_weight(spn, smtvars):
     Currently only works with Gaussian and (binary) Categorical types.
 
     '''
-    print('SPN: ', spn)
-    print('scope: ', spn.scope)
-    print('smtvars: ', smtvars)
-    print()
-
     if isinstance(spn, SPNSum):
         assert(np.isclose(np.sum(spn.weights), 1.0))
         wsum = [Times(Real(float(spn.weights[i])),
