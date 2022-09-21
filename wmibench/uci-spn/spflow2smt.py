@@ -30,11 +30,12 @@ def spn_to_weight(spn, smtvars):
         return Times(*[spn_to_weight(c, smtvars) for c in spn.children])
 
     elif isinstance(spn, Categorical):
-        assert(len(spn.p) == 2)
+        assert(len(spn.p) <= 2)
         assert(np.isclose(np.sum(spn.p), 1.0))
+        welse = float(spn.p[0]) if len(spn.p) == 2 else 0.0
         return Ite(smtvars[spn.scope[0]],
-                   Real(float(spn.p[1])),
-                   Real(float(spn.p[0])))
+                   Real(float(spn.p[-1])),
+                   Real(welse))
 
     elif isinstance(spn, Gaussian):
         return Times(Real(float(1/np.sqrt(spn.variance*2*np.pi))),
