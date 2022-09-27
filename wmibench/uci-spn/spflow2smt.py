@@ -42,7 +42,7 @@ def spn_to_weight(spn, smtvars):
                      Exp(Times(Real(float(-1/(2*spn.variance))),
                                Pow(Minus(smtvars[spn.scope[0]],
                                          Real(float(spn.mean))),
-                                   Real(2)))))        
+                                   Real(2)))))
     else:
         raise NotImplementedError(f"Unsupported node: {type(spn)}")
 

@@ -1,54 +1,95 @@
 
-A collection of benchmarks for *PROBABILISTIC INFERENCE* 
-with **algebraic** and **logical** constraints.
+# wmibench
+
+This is `wmibench`, a collection of benchmarks for *PROBABILISTIC INFERENCE with
+**algebraic** and **logical*** constraints, implemented in Python 3.
+
+- The hybrid logical/algebraic constraints are encoded as
+[Satisfiability Modulo Theories
+(SMT)](https://en.wikipedia.org/wiki/Satisfiability_modulo_theories)
+formulas over Boolean and continuous variables.
+- Densities are
+either piecewise polynomials or Gaussians.
+
+The format is based on `pywmi`
+([GitHub](https://github.com/weighted-model-integration/pywmi)).
+
+The goal of this package is providing a unified library for testing
+pywmi-compatible [Weighted Model
+Integration](http://web.cs.ucla.edu/~guyvdb/papers/BelleIJCAI15.pdf)
+[Belle et al. 2015] algorithms.
+
+## Synthetic benchmarks
+
+A number of algorithms for generating synthetic benchmarks are included:
+
+- Randomized weighted SMT formulas from "Efficient WMI via SMT-Based Predicate Abstraction" [Morettin et al. 2017] ([pdf](https://www.ijcai.org/proceedings/2017/0100.pdf)) and follow-up works;
+- Synthetic problems from the following classes: DUAL, XOR, MUTEX, CLICK from Kolb et al., 2019 ([pdf](http://proceedings.mlr.press/v115/kolb20a/kolb20a.pdf)), STAR, 3-ARY and PATH from Zeng et al., 2020 ([pdf](http://proceedings.mlr.press/v115/zeng20a/zeng20a.pdf)).
+
+### Randomized
+
+write
+
+### Structured
+
+write
 
 
-## Hybrid UCI datasets
+## Answering random algebraic queries on ML models
 
-Some benchmarks are based on (a selection of) [UCI
+The following benchmarks test the capabilities of answering random
+oblique queries of the form:
+
+$Pr(w X \le b)$ with $w \in \mathbb{R}^k, b \in \mathbb{R}$
+
+on probabilistic models learned from data.
+
+Specifically, the models are trained on (a selection of) [UCI
 datasets](https://archive.ics.uci.edu/ml/index.php) having both
 continuous and discrete features. These datasets are included in
 `data/uci-datasets`.
 
 
-## Random queries on DETs trained on UCI datasets
+### Density Estimation Trees
 
 The paper ["SMT-based weighted model integration with structure
 awareness"](https://proceedings.mlr.press/v180/spallitta22a/spallitta22a.pdf)
-(Spallitta et al., 2022) first featured experiments where ["Density
-Estimation Trees"](https://dl.acm.org/doi/pdf/10.1145/2020408.2020507)
-(Ram and Grey, 2011) are trained on UCI datasets.
+(Spallitta et al., 2022) first featured experiments where
+probabilities of oblique queries are computed on ["Density Estimation
+Trees"](https://dl.acm.org/doi/pdf/10.1145/2020408.2020507) (Ram and
+Grey, 2011).
 
-A number of random queries over the continuous variable models are
-generated:
+To generate the benchmarks, run:
 
-$Pr(w X \le b)$ with $w \in \mathbb{R}^k, b \in \mathbb{R}$
-
-Go to `uci-det/` and run:
-
-`python3 generate_dets.py N_MIN N_MAX NQUERIES QUERYHARDNESS SEED`
+`python3 uci-det/uci-det.py N_MIN N_MAX NQUERIES QUERYHARDNESS SEED`
 
 where:
 
-- `NMIN` and `NMAX` are hyperparameters of the greedy DET learning algorithm. They constrain the min. and max. number of instances in the leaves of the DET
-- `NQUERIES` and `QUERYHARDNESS` respectively control how many queries over the learned models are generated and the ratio of variables involved in the query.
-- `SEED` sets a seed number
+- `NMIN` and `NMAX` are hyperparameters of the greedy DET learning algorithm;
+- `NQUERIES` and `QUERYHARDNESS` respectively control how many queries are generated and the ratio of variables involved in them;
+- `SEED` sets the seed number of the pseudo-random number generator.
 
 
-## Random queries on SPNs trained on UCI datasets
+### Sum-Product Networks
 
-The same setting was investigated, using Sum-Product Networks (see
-e.g. ["Sum-product networks: A new deep
+Sum-Product Networks (see e.g. ["Sum-product networks: A new deep
 architecture"](https://ieeexplore.ieee.org/iel5/6114268/6130192/06130310.pdf)
-(Poon and Domingos, 2011)) instead of DETs.
+(Poon and Domingos, 2011)) with Gaussian and Categorical leaves are also considered.
 
-Go to `uci-spn/` and run:
+These benchmarks additionally require the `SPFlow` library
+([GitHub](https://github.com/SPFlow/SPFlow)).
 
-`python3 generate_spns.py N_MIN N_MAX NQUERIES QUERYHARDNESS SEED`
+Run:
+
+`python3 uci-spn/uci-spn.py MIN_INST_SLICE NQUERIES QUERYHARDNESS SEED`
 
 where:
 
-- `NMIN` and `NMAX` are hyperparameters of the greedy DET learning algorithm. They constrain the min. and max. number of instances in the leaves of the DET
-- `NQUERIES` and `QUERYHARDNESS` respectively control how many queries over the learned models are generated and the ratio of variables involved in the query.
-- `SEED` sets a seed number
+- `MIN_INST_SLICE` is an hyperparameter of the greedy SPN learning algorithm;
+- `NQUERIES` and `QUERYHARDNESS` respectively control how many queries are generated and the ratio of variables involved in them;
+- `SEED` sets the seed number of the pseudo-random number generator.
 
+
+## Fairness of probabilistic programs
+
+write
