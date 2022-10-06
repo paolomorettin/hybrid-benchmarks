@@ -224,7 +224,7 @@ def main():
     if seedn is None:
         seedn = int(time.time())
 
-    output_dir = "models_r{}_b{}_d{}_m{}_s{}".format(n_reals, n_bools, depth, n_models, seedn)
+    output_dir = "pa_r{}_b{}_d{}_m{}_s{}".format(n_reals, n_bools, depth, n_models, seedn)
     output_dir = path.join(output, output_dir)
 
     check_input_output(output, output_dir)
