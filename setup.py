@@ -6,11 +6,11 @@ from os import path
 
 NAME = 'wmibench'
 DESCRIPTION = 'Unified benchmark library for Weighted Model Integration.'
-URL = 'http://github.com/unitn-sml/wmi-benchmarks'
+URL = 'http://github.com/weighted-model-integration/wmibench'
 EMAIL = 'paolo.morettin@kuleuven.be'
 AUTHOR = 'Paolo Morettin'
 REQUIRES_PYTHON = '>=3.5.0'
-VERSION = "0.1"
+VERSION = "1.0"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -44,7 +44,8 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     python_requires=REQUIRES_PYTHON,
-    packages=find_packages(exclude=('test', 'examples')),
+    packages=find_packages(),
+#    packages=find_packages(exclude=('test', 'examples')),
     zip_safe=False,
     install_requires=REQUIRED,
     extras_require=EXTRAS

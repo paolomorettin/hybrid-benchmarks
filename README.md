@@ -21,18 +21,40 @@ Integration](http://web.cs.ucla.edu/~guyvdb/papers/BelleIJCAI15.pdf)
 
 ## Synthetic benchmarks
 
-A number of algorithms for generating synthetic benchmarks are included:
-
-- Randomized weighted SMT formulas from "Efficient WMI via SMT-Based Predicate Abstraction" [Morettin et al. 2017] ([pdf](https://www.ijcai.org/proceedings/2017/0100.pdf)) and follow-up works;
-- Synthetic problems from the following classes: DUAL, XOR, MUTEX, CLICK from Kolb et al., 2019 ([pdf](http://proceedings.mlr.press/v115/kolb20a/kolb20a.pdf)), STAR, 3-ARY and PATH from Zeng et al., 2020 ([pdf](http://proceedings.mlr.press/v115/zeng20a/zeng20a.pdf)).
+A number of algorithms for generating synthetic benchmarks are included.
 
 ### Randomized
 
-write
+Randomized weighted SMT formulas from "Efficient WMI via SMT-Based Predicate Abstraction" [Morettin et al. 2017] ([pdf](https://www.ijcai.org/proceedings/2017/0100.pdf)) and follow-up works.
+
+Run:
+
+`python3 synthetic/synthetic_pa.py [-h] [-o OUTPUT] [-r REALS] [-b BOOLEANS] [-d DEPTH] [-m MODELS] [-s SEED]`
 
 ### Structured
 
-write
+Synthetic problems from the following classes:
+
+1- Kolb et al., 2019 ([pdf](http://proceedings.mlr.press/v115/kolb20a/kolb20a.pdf));
+2- Zeng et al., 2020 ([pdf](http://proceedings.mlr.press/v115/zeng20a/zeng20a.pdf)).
+
+Run:
+
+`python3 synthetic/synthetic_structured.py [-h] [-s SEED] [--output_folder OUTPUT_FOLDER] class size`
+
+with `class` in:
+
+- xor [1]
+- mutex [1]
+- click [1]
+- uni [1]
+- dual [1]
+- dual_paths [1]
+- dual_paths_distinct [1]
+- and_overlap [1]
+- tpg_star [2]
+- tpg_3ary_tree [2]
+- tpg_path [2]
 
 
 ## Answering random algebraic queries on ML models
@@ -92,4 +114,4 @@ where:
 
 ## Fairness of probabilistic programs
 
-write
+TODO
