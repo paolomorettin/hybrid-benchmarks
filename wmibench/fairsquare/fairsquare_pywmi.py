@@ -59,29 +59,27 @@ def weight_to_pysmt(vdist, epsilon=1e-3):
 
     return And(*bounds), Times(*factors)
             
-            
+
+
+def convert(input_path, output_path=None):
     
-
-    
-
-
-if __name__ == '__main__':
-
-    from sys import argv
-
-    if len(argv) != 2:
-        print("USAGE: python3 fairsquare_pywmi PATH")
-        exit(1)
-
-    path = argv[1]
-    with open(path, 'r') as f:
+    with open(input_path, 'r') as f:
         node = ast.parse(f.read())
 
     p = Encoder()
     p.visit(node)
+
+    print("Encoding:\n")
+
+    print("Model:\n", p.model, "\n\n")
+
+    print("Program:\n", p.program, "\n\n")
+
+    print("--------------------------------------------------")
     
     program = And(z3_to_pysmt(p.model),
-                  z3_to_pysmt(p.program))
+                  z3_to_pysmt(p.program),
+                  And(*(z3_to_pysmt(m) for m in p.mutex)))
 
     bounds, weight = weight_to_pysmt(p.vdist)
     support = And(program, bounds)
@@ -98,7 +96,23 @@ if __name__ == '__main__':
     domain = Domain.make(bvars, cvars, cbounds)
     density = Density(domain, support, weight, queries)
 
-    density_path = path + '_density.json'
-    density.to_file(density_path)
+    if output_path is not None:
+        density.to_file(output_path)
+
+    return density
+    
+
+
+if __name__ == '__main__':
+
+    from sys import argv
+
+    if len(argv) != 2:
+        print("USAGE: python3 fairsquare_pywmi PATH")
+        exit(1)
+
+    path = argv[1]
+    output_path = path + '_density.json'
+    convert(path, output_path)
 
 

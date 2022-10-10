@@ -227,6 +227,8 @@ class Encoder(ast.NodeVisitor):
         self.model = None
         self.program = None
 
+        self.mutex = []
+
     def doSeq(self, seq, d):
         trans = []
         for s in seq:
@@ -456,13 +458,12 @@ class Encoder(ast.NodeVisitor):
 
         #print "COND: ", zcond
         #print "ZT: ", zthen
-        #print "ZELSE: ", zelse
+        #print "ZELSE: ", zelse        
 
         resT = Implies(zcond, And(zthen, zphiT))
         resE = Implies(Not(zcond), And(zelse, zphiE))
-        #res = And(resT, resE)
-        res = And(resT, resE, Or(Not(And(zthen, zphiT)),
-                                 Not(And(zelse, zphiE))))
+        res = And(resT, resE)
+        self.mutex.append(Or(Not(zphiT), Not(zphiE)))
 
         #res = And(If(zcond, And(zthen, zphiT), And(zelse, zphiE)))
 
