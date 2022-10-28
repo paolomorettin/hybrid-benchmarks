@@ -13,11 +13,12 @@ def generate(nmin, nmax, nqueries, qhardness, root_folder, seed):
         det = DET(feats, nmin, nmax)
         det.grow_full_tree(train)
         det.prune_with_validation(valid)
+
         domain, support, weight = det.to_pywmi()
         queries = generate_random_queries(domain, nqueries, qhardness, seed,
                                           support=support)            
         density = Density(domain, support, weight, queries)
-        return density
+        return density, det.size()
 
     if not os.path.isdir(root_folder):
         os.mkdir(root_folder)

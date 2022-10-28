@@ -13,6 +13,13 @@ def get_context_from_dataset(feats, train):
              for f in feats]
     return Context(parametric_types=types).add_domains(train)
 
+def spn_size(spn):
+    if isinstance(spn, SPNSum) or isinstance(spn, SPNProduct):
+        return 1 + sum([spn_size(c) for c in spn.children])
+    else:
+        return 0
+ 
+
 def spn_to_weight(spn, smtvars):
     ''' Converts an SPN in SPFlow into a weight function in pysmt.
 
@@ -75,5 +82,6 @@ def convert(context, spn):
     support = And(*clauses)
     weight = spn_to_weight(spn, smtvars)
     domain = Domain.make(bvars, cvars, cbounds)
+    size = spn_size(spn)
 
-    return support, weight, domain
+    return support, weight, domain, size

@@ -80,24 +80,10 @@ def read_data(path, feats):
 
     return np.array(data)
 
-def uci_latex_table():
-    ''' Generates a LaTeX table with statistics on the dataset.'''
-    
-    rows = ['\\hline', 'Dataset & $|\\allA|$ & $|\\allX|$ & \\# Train & \\# Valid\\\\', '\\hline']
-    for size in EXPERIMENTS:
-        for exp in EXPERIMENTS[size]:
-            featfile = os.path.join(DATAFOLDER, f'{exp}.features')
-            feats = read_feats(featfile)
-            train = read_data(os.path.join(DATAFOLDER, f'{exp}.train.data'), feats)
-            valid = read_data(os.path.join(DATAFOLDER, f'{exp}.valid.data'), feats)
-            nbools = len([v for v in feats if v.symbol_type() == BOOL])
-            nreals = len([v for v in feats if v.symbol_type() == REAL])
-            rows.append(f'{exp} & {nbools} & {nreals} & {len(train)} & {len(valid)} \\\\')
-
-    with open('table.tex', 'w') as f:
-        f.write('\n'.join(rows))
-
 def generate_uci_loop(root_folder, uci_to_pywmi):
+    latex_tab = ['\\begin{tabular}{|l|c|c|c|c|c|}', '\\hline',
+                 'Dataset & $|\\allA|$ & $|\\allx|$ & \\# Train & \\# Valid & Size \\\\',                 
+                 '\\hline']
 
     for size in EXPERIMENTS:
         benchmark_folder = os.path.join(root_folder, f'{size}')
@@ -109,10 +95,10 @@ def generate_uci_loop(root_folder, uci_to_pywmi):
             # fresh pysmt environment
             reset_env()
     
-            detfile = os.path.join(benchmark_folder, f'{exp}.json')
+            density_path = os.path.join(benchmark_folder, f'{exp}.json')
 
-            if os.path.isfile(detfile):
-                print(f"{detfile} exists. Skipping.")
+            if os.path.isfile(density_path):
+                print(f"{density_path} exists. Skipping.")
                 continue
 
             print(f"{exp} : Parsing data")
@@ -121,5 +107,15 @@ def generate_uci_loop(root_folder, uci_to_pywmi):
             train = read_data(os.path.join(DATAFOLDER, f'{exp}.train.data'), feats)
             valid = read_data(os.path.join(DATAFOLDER, f'{exp}.valid.data'), feats)
             print(f"{exp} : Training model & generating queries")                        
-            density = uci_to_pywmi(feats, train, valid)
-            density.to_file(detfile)  # Save to file    
+            density, size = uci_to_pywmi(feats, train, valid)
+            density.to_file(density_path)  # Save to file
+
+            nbools = len([v for v in feats if v.symbol_type() == BOOL])
+            nreals = len([v for v in feats if v.symbol_type() == REAL])
+            latex_tab.append(f'{exp} & {nbools} & {nreals} & {len(train)} & {len(valid)} & {size} \\\\')
+
+
+    latex_tab.append('\\hline \\end{tabular}')
+    latex_tab_path = os.path.join(root_folder, 'table.tex')
+    with open(latex_tab_path, 'w') as f:
+        f.write('\n'.join(latex_tab))

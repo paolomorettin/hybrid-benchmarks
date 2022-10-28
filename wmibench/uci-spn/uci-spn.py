@@ -16,11 +16,12 @@ def generate(min_instances_slice, nqueries, qhardness, root_folder, seed):
     def uci_to_pywmi(feats, train, valid):
         context = get_context_from_dataset(feats, train)        
         spn = learn_parametric(train, context, min_instances_slice=min_instances_slice)
-        support, weight, domain = convert(context, spn)
+        
+        support, weight, domain, size = convert(context, spn)
         queries = generate_random_queries(domain, nqueries, qhardness, seed,
                                           support=support)            
         density = Density(domain, support, weight, queries)
-        return density
+        return density, size
 
     if not os.path.isdir(root_folder):
         os.mkdir(root_folder)
