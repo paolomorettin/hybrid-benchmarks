@@ -105,7 +105,7 @@ class ModelGenerator:
             return Plus(monomials)
 
     def _random_monomial(self, minsize=None, maxsize=None):
-        minsize = minsize if minsize else 1
+        minsize = minsize if minsize else 0
         maxsize = maxsize if maxsize else len(self.reals)
         size = randint(minsize, maxsize)
         rvars = sample(self.reals, size)
